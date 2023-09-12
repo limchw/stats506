@@ -1,0 +1,316 @@
+---
+title: "STATS 506 Problem 1- Chaewon Lim"
+format: pdf
+editor: visual
+---
+
+## Problem 1 - Wine data
+
+## a.
+
+```{r}
+library(dplyr)
+wine <- read.csv("/Users/chaewonlim/Desktop/STATS506/wine/wine.data", header = FALSE)
+```
+
+## b.
+
+```{r}
+colnames(wine) <-c("Class", "Alcohol", "Malicacid", "Ash", "Alcalinityofash", 
+                   "Magnesium", "Totalphenols", "Flavanoids", 
+                   "Nonflavanoidphenols", "Proanthocyanins", "Colorintensity", 
+                   "Hue", "OD280", "Proline")   
+
+table(wine$Class)
+
+#The number of wines within each class is correct as reported in “wine.names”
+```
+
+## c.
+
+```{r}
+#1
+
+wine$Class[which.max(wine$Alcohol)]
+
+#The wine with the highest alcohol content belongs to class 1.
+
+#2
+
+wine$Class[which.min(wine$Alcohol)]
+
+#The wine with the lowest alcohol content belongs to class 2.
+
+#3
+
+german <- 114
+
+nrow(wine[wine$Magnesium > german,])
+
+# 26 of wines have higher levels of magnesium than German beer.
+
+#4
+
+wine %>% group_by(Class) %>% summarise(sum(Magnesium >german))
+
+# 15 wines have higher levels of magnesium than average German beer in class 1, 
+# 6 for class 2, and 5 for class 3. 
+```
+
+## d.
+
+```{r}
+overallavg <- wine %>% summarise_all(mean)
+
+classavg <- wine %>% group_by(Class) %>% summarise_all(mean)
+
+avgs <- rbind(overallavg, classavg)
+
+avgs <- subset(avgs, select = -c(Class))
+
+print(avgs)
+
+#The first row is the overall average, and second, third, and fourth 
+#are class averages of class 1, 2, and 3. 
+```
+
+## e.
+
+```{r}
+class_1 <- wine[wine$Class == 1, "Ash"]
+class_2 <- wine[wine$Class == 2, "Ash"]
+class_3 <- wine[wine$Class == 3, "Ash"]
+
+ttest_12 <- t.test(class_1, class_2)
+ttest_13 <- t.test(class_1, class_3)
+ttest_23 <- t.test(class_2, class_3)
+
+print(ttest_12)
+print(ttest_13)
+print(ttest_23)
+
+#The results show that there is a statistically significant
+#difference in the level of Ash between Class 1 and Class 2 / Class 2 and 
+#Class 3 because the p-value is very small < 0.05.
+
+#The result show that there is no statistically significant difference in the
+#level of Ash between Class 1 and Class 3 since p-value is > 0.5. 
+
+```
+
+## Problem 2 - Perfect Powers
+
+## a.
+
+```{r}
+isPerfectPower <- function(number, power) {
+  if (power >= 2) {
+    root <- number ** (1/power)
+    if (all.equal(round(root) ** power, number) == TRUE) {
+      return(list(isPerfect = TRUE, root = root))
+    } 
+    else {
+      return(list(isPerfect = FALSE, root = NULL))
+    }
+  }
+  else{
+    return("We must have power equal or greater than 2.")
+  }
+}
+
+isPerfectPower(27, power = 2)
+```
+
+## b.
+
+```{r}
+findRootPower <- function(number) {
+  for (power in 2:30) {
+    find <- isPerfectPower(number, power)
+    if (find$isPerfect == TRUE) {
+      return(paste(number, "=", find$root, "^", power))
+    }
+  }
+  return(paste(number, "is not a perfect power."))
+}
+
+findRootPower(125)
+findRootPower(27)
+findRootPower(13060694016)
+findRootPower(7776)
+findRootPower(170859375)
+findRootPower(58247422)
+findRootPower(94143178827)
+
+```
+
+## Problem 3 -ChatGPT
+
+## a.
+
+```{r}
+# Function to identify the poker hand
+identify_poker_hand <- function(suits, ranks) {
+  # Create a frequency table for ranks
+  rank_counts <- table(ranks)
+  
+  # Sort ranks in descending order of frequency
+  sorted_ranks <- sort(unique(ranks), decreasing = TRUE)
+  
+  # Check for flush (all the same suit)
+  is_flush <- length(unique(suits)) == 1
+  
+  # Check for straight (consecutive ranks)
+  is_straight <- all(diff(sorted_ranks) == 1)
+  
+  if (is_flush && is_straight) {
+    # Royal Flush (A, K, Q, J, 10, same suit)
+    if (all(sorted_ranks %in% c(10, 11, 12, 13, 14))) {
+      return("Royal Flush")
+    }
+    # Straight Flush (consecutive ranks, same suit)
+    return("Straight Flush")
+  }
+  
+  if (is_flush) {
+    # Flush (all the same suit)
+    return("Flush")
+  }
+  
+  if (is_straight) {
+    # Straight (consecutive ranks)
+    return("Straight")
+  }
+  
+  if (max(rank_counts) == 4) {
+    # Four of a Kind (four cards with the same rank)
+    return("Four of a Kind")
+  }
+  
+  if (max(rank_counts) == 3 && sum(rank_counts == 2) == 1) {
+    # Full House (three of a kind and a pair)
+    return("Full House")
+  }
+  
+  if (max(rank_counts) == 3) {
+    # Three of a Kind (three cards with the same rank)
+    return("Three of a Kind")
+  }
+  
+  if (sum(rank_counts == 2) == 2) {
+    # Two Pair (two pairs of cards with the same rank)
+    return("Two Pair")
+  }
+  
+  if (sum(rank_counts == 2) == 1) {
+    # One Pair (one pair of cards with the same rank)
+    return("One Pair")
+  }
+  
+  # High Card (none of the above)
+  return("High Card")
+}
+
+# Function to simulate dealing a round of poker
+deal_poker_round <- function(num_players) {
+  # Define suits and ranks
+  suits <- rep(c("Hearts", "Diamonds", "Clubs", "Spades"), each = 13)
+  ranks <- rep(2:14, times = 4)
+  
+  # Create a deck of cards
+  deck <- data.frame(Suit = suits, Rank = ranks)
+  
+  # Shuffle the deck
+  deck <- deck[sample(nrow(deck)), ]
+  
+  # Deal hands to players
+  player_hands <- split(deck, 1:num_players)
+  
+  # Identify and display each player's hand
+  for (i in 1:num_players) {
+    player_hand <- player_hands[[i]]
+    cat("Player", i, "Hand:\n")
+    print(player_hand)
+    hand_name <- identify_poker_hand(player_hand$Suit, player_hand$Rank)
+    cat("Hand Name:", hand_name, "\n\n")
+  }
+}
+```
+
+## b.
+
+```{r}
+# Simulate a round of poker with 2, 5, 10 players
+deal_poker_round(2)
+deal_poker_round(5)
+deal_poker_round(10)
+#It runs fine. 
+```
+
+## c.
+
+The first function identifies the poker hand with two inputs of suits and ranks. Inside the function, it first creates a table for the frequency of ranks and declares the table as rank_counts. Then, the code sorts ranks in descending order of frequency and save them into the sorted_ranks. Then, the function checks for flush, meaning if all the cards are the same suit. This is done by finding the unique cases of suits and checking their length equals one. This means that there is only one unique suit on the cards, meaning that they are all the same suit.
+
+Then, the code checks for straight, if the cards are in consecutive ranks. To do this, the code uses the sorted_ranks and checks that the difference between the sorted ranks is all equal to one, which means that the ranks of the cards are consecutive. 
+
+Now the function uses if statement to return the name of the hand. The first if statement checks for two kinds of flush, which are the royal flush and straight flush. It checks if the cards are both flush and straight. To determine the royal flush, the code checks all the unique ranks of the cards in one of 10,11,12,13 and 14, which represent, 10, Jack, Queen, King, and Ace. If the unique ranks in the hand are not of 10, 11, 12, 13, 14, it will just return a statement saying "Straight Flush." Then the code checks if the cards are all the same suit, flush, which has been declared above in is_flush. If is_flush = True, the function will return \"Flush.\" The next code checks if the cards have consecutive ranks; straight, which has also been declared above in is_straight. If is_straight = True, the function will return \"Straight.\"
+
+Then, the function checks if the four cards in the hand have the same rank. This is done through max(rank_counts) == 4. That means that the code counts the frequency of each rank. Then, between that frequency table, if the maximum is 4, that means that four cards have the same rank, and the function will return \"Four of a Kind.\"
+
+The code then checks for the full house, by checking if the three cards are within the same rank, and there is exactly one pair of cards with the same rank. The former is the same logic with the four of a kind, and the latter checks if the frequency of a certain rank is 2 and that only happens once. If these two are true, the function returns \"Full House.\" The code then checks for three of a kind, which is the same logic with four of kind, but check if three cards are within the same rank. The next code checks if two pairs of cards have the same rank. This is done by checking the ranks that have frequency of two and this happens twice. If this is true, the code returns \"Two Pair.\" Next, the function checks for one pair, which is the same logic as two pairs, but checks if there is one pair of cards of the same rank. If none of the above is true, the function will return \"High Card\".
+
+The second function takes input of num_players, meaning the number of players. Then the function defines suits and ranks, which each is 13 replicates of Hearts, Diamonds, Clubs, and Spades, and 4 replicates of numbers 2 through 14. Then, it creates a deck of cards, which is a data frame of suits and ranks created above, so that there are all 52 cards in a standard card. Then the code shuffles the deck, and nrow(deck) will get the number of cards, which is 52. Using the function sample, it will perform random permutation from 1 to 52, meaning the index will be shuffled. Then, now we use shuffled index to the original deck of card. Based on the input of the number of players, the function will split the deck by a sequence of numbers 1 through the number of players. Then, the list of a data frame will be declared as player_hands, representing the cards of each player. Using a for loop with index 1 through the number of players, the code will find each card of each player and print out the suits and corresponding rank of the cards in a data frame. After printing all the cards of each player, the function will use the identify_poker_hand with input of suit and rank of each player\'s card, and save it into the variable hand_name. Finally, the function will print out the hand of each card that players have. 
+
+## d.
+
+Yes, the first function takes in the vector of suits and ranks and returns the name of the hand, and the second function takes input of the number of players, and it returns the cards of all players and the name of each player's hands. The hands are valid, meaning all card names seem realistic. There are no duplicates and returns the "right number." The code has all the names of the hands correct. There are no duplicates in cards across hands. However, one flaw of the second code is that it does not ensure that players get 5 cards each if the players are equal or fewer than 10 and does not produce an error sign stating that there are shortages of cards when there are more than 10 players.
+
+Now, I am going to modify the code that the code ensures to give 5 cards each to the player and print a line saying "The number of players must be less than 11."
+
+```{r}
+# Function to simulate dealing a round of poker
+deal_poker_round <- function(num_players) {
+  if (num_players <= 10) {
+  # Define suits and ranks
+  suits <- rep(c("Hearts", "Diamonds", "Clubs", "Spades"), each = 13)
+  ranks <- rep(2:14, times = 4)
+  
+  # Create a deck of cards
+  deck <- data.frame(Suit = suits, Rank = ranks)
+  
+  # Shuffle the deck
+  deck <- deck[sample(nrow(deck)), ]
+  
+  # Initialize a list of hands of plyaer
+  player_hands <- vector("list", length = num_players)
+  
+  for (i in 1:num_players) {
+    start <- (i - 1) * 5 + 1
+    end <- i * 5
+    player_hands[[i]] <- deck[start:end, ]
+  }
+  
+  # Identify and display each player's hand
+  for (i in 1:num_players) {
+    player_hand <- player_hands[[i]]
+    cat("Player", i, "Hand:\n")
+    print(player_hand)
+    hand_name <- identify_poker_hand(player_hand$Suit, player_hand$Rank)
+    cat("Hand Name:", hand_name, "\n\n")
+    }
+  }
+  else{
+    print("The number of players must be less than 11.")
+  }
+}
+```
+
+```{r}
+deal_poker_round(10)
+```
+
+```{r}
+deal_poker_round(11)
+```
+
+Now, the code is modified in correct way that the question wanted.
