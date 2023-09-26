@@ -1,0 +1,295 @@
+---
+title: "STATS506PS2"
+format: pdf
+editor: visual
+---
+
+## Problem 1
+
+```{r}
+#https://github.com/limchw/stats506
+library(microbenchmark)
+library(interactions)
+```
+
+a\.
+
+```{r}
+#Version 1
+v1 <- function(rolls) {
+  #Initializing
+  amount = 0
+  set.seed(506)
+  roll <- sample(1:6, rolls, replace = TRUE)
+  #Using for loop over the die rolls and adding to the amount
+  for (i in 1:rolls) {
+    amount = amount - 2
+    if (roll[i] %in% c(2, 4, 6)) {
+      amount = amount + roll[i]
+    } 
+    else {
+      amount = amount
+    }
+  }
+  return(amount)
+}
+
+#Version 2
+v2 <- function(rolls) {
+  set.seed(506)
+  #Using vectorized functions and adding to the amount
+  roll <- sample(1:6, rolls, replace = TRUE)
+  wins <- roll[roll %in% c(2, 4, 6)]
+  amount <- -2 * rolls + sum(wins)
+  return(amount)
+}
+
+#Version 3
+v3 <- function(rolls) {
+  set.seed(506)
+  #Making a list 1 to 6
+  onetosix <- 1:6
+  roll <- sample(1:6, rolls, replace = TRUE)
+  #Using table that stores frequency of each die rolls and declaring amount
+  tb <- table(roll)
+  missing_values <- onetosix[!(1:6 %in% names(tb))]
+  tb[as.character(missing_values)] <- 0
+  amount = -2 * rolls + 2 * sum(tb[names(tb) == 2]) + 
+    4 * sum(tb[names(tb) == 4]) + 6 * sum(tb[names(tb) == 6])
+  return(amount)
+}
+
+#Version 4
+v4 <- function(rolls) {
+  set.seed(506)
+  roll <- sample(1:6, rolls, replace = TRUE)
+  #Using sapply and declaring amount
+  wins <- sapply(roll, function(num) {
+    if (num %in% c(2, 4, 6)) {
+      return(num)
+    } 
+    else {
+      return(0)
+    }
+  })
+  amount <- -2 * rolls + sum(wins)
+  return(amount)
+}
+```
+
+b., c.
+
+```{r}
+# Function to test all four versions
+test_versions <- function(rolls) {
+  return(list(v1(rolls), v2(rolls), v3(rolls), v4(rolls)))
+}
+
+test_versions(3)
+test_versions(3000)
+```
+
+All versions work and all results for four versions are the same.
+
+d\.
+
+```{r}
+# Measure execution time with microbenchmark
+low_input_benchmark <- microbenchmark(
+  version1 = v1(100),
+  version2 = v2(100),
+  version3 = v3(100),
+  version4 = v4(100),
+  # Number of iterations
+  times = 1000  
+)
+
+large_input_benchmark <- microbenchmark(
+  version1 = v1(10000),
+  version2 = v2(10000),
+  version3 = v3(10000),
+  version4 = v4(10000),
+  times = 1000  
+)
+
+print(low_input_benchmark)
+print(large_input_benchmark)
+```
+
+For low input, v2 is the fastest and v4 is the slowest. For large input, v2 is still the fastest, and v4 is the slowest. Hence, v2 works the best, and v3 works better for low input, and v1 and v4 slow down for large input.
+
+e\.
+
+```{r}
+#Function for calculating average amount of money earned with 
+#input of number of rounds
+simulate_game <- function(num_rounds) {
+  winnings <- numeric(num_rounds)
+  for (i in 1:num_rounds) {
+    roll <- sample(1:6, 1)
+    if (roll %in% c(2, 4, 6)) {
+      winnings[i] <- roll
+    } 
+    else {
+      winnings[i] <- 0
+    }
+  }
+  average_winnings <- (-2 * num_rounds + sum(winnings)) / 
+    (length(winnings) + num_rounds)
+  return(average_winnings)
+}
+
+# Number of game rounds to simulate
+num_rounds <- 100000
+
+simulate_game(num_rounds)
+```
+
+The mean of 100000 times of Monte Carlo simulation is a number very close to 0, hence I believe that this is a fair game.
+
+## Problem 2
+
+a\.
+
+```{r}
+#Reading data
+cars <- read.csv("/Users/chaewonlim/Downloads/cars.csv")
+
+#Renaming columns
+colnames(cars) <- c("Height", "Length", "Width", "Driveline", 
+                    "EngineType", "Hybrid", "NumForwardGears", "Transmission", 
+                    "CityMpg", "FuelType", "HighwayMpg", "Classification",
+                  "ID", "Maker", "ModelYear", "YearReleased", "Horsepower", "Torque")
+
+```
+
+b\.
+
+```{r}
+#Restricting the data to cars with fuel type of "Gasoline"
+cars <- cars[cars$FuelType == "Gasoline", ]
+```
+
+c\.
+
+```{r}
+#Creating the linear regression model
+model <- lm(HighwayMpg ~ Horsepower + Torque + Length + Width + 
+              Height + as.factor(YearReleased), data = cars)
+
+#Summary of the linear regression model
+summary(model)
+```
+
+The estimated coefficient for horsepower in the model indicates a statistically significant positive relationship between horsepower and highway MPG since p-value is smaller than 0.5. However, the effect size is relatively small of 0.0163556, suggesting that while increasing horsepower tends to lead to improved highway MPG, other variables also play a role in explaining variations in MPG.
+
+d\.
+
+```{r}
+# Fit the linear regression model with interaction
+intmodel <- lm(HighwayMpg ~ Length + Width + Height + 
+                 as.factor(YearReleased) + Horsepower * Torque, data = cars)
+
+#Checking reasonable values (1st qu., median, 3rd qu.)
+summary(cars$Torque)
+summary(cars$Horsepower)
+
+#Selecting reasonable values for torque, horsepower, and year
+torquevals = c(177, 257, 332)
+horsepowervals = c(185, 263, 317)  
+year_value <- 2010
+
+# Generate interaction plot
+interact_plot(intmodel, pred = Horsepower, modx = Torque, 
+              at = list(YearReleased = 2011), data = cars)
+```
+
+Based on summary statistic, the reasonable values for torque will be 177, 257, and 332, which are the 1st quantile, median, and 3rd quantile. The reasonable value for Horsepower will be about 185, 263, and 317, which are around the 1st quantile, median, and 3rd quantile. I choose year 2011 because it is close to the middle, but more recent than the mean of released years. As torque increases, the effect of horsepower to highway MPG becomes smaller.
+
+e\.
+
+```{r}
+#coefficients (betas) from the model
+beta_lm <- intmodel$coefficients
+
+#creating matrix
+y <- cars$HighwayMpg
+
+X <- model.matrix(HighwayMpg ~ Length + Width + Height + as.factor(YearReleased) + Horsepower * Torque, data = cars)
+
+# Calculate coefficients using the OLS formula
+beta_direct <- solve(t(X) %*% X) %*% t(X) %*% y
+
+print(beta_lm)
+print(beta_direct)
+```
+
+They are the same.
+
+## Problem 3.
+
+a\.
+
+``` stata
+//load the data
+import delimited "/Users/limcw/Downloads/cars.dta"
+//rename variables
+rename dimensionsheight Height
+rename dimensionslength Length
+rename dimensionswidth Width
+rename engineinformationdriveline Driveline
+rename engineinformationenginetype EngineType
+rename engineinformationhybrid Hybrid
+rename engineinformationnumberofforward NumForwardGears
+rename engineinformationtransmission Transmission
+rename fuelinformationcitympg CityMpg
+rename fuelinformationfueltype FuelType
+rename fuelinformationhighwaympg HighwayMpg
+rename identificationclassification Classification
+rename identificationid ID
+rename identificationmake Maker
+rename identificationmodelyear ModelYear
+rename identificationyear YearReleased
+rename engineinformationenginestatistic Horsepower
+rename v18 Torque
+```
+
+b\.
+
+``` stata
+//keep data points with fuel type of gasoline
+keep if FuelType == "Gasoline"
+```
+
+![](Downloads/attachments/Screenshot 2023-09-25 at 9.58.29 PM.png){width="186" height="24"}
+
+c\.
+
+``` stata
+//linear regression for c.
+regress HighwayMpg Horsepower Torque Length Width Height i.YearReleased
+```
+
+![](Downloads/attachments/Screenshot 2023-09-25 at 9.58.42 PM.png)
+
+The estimated coefficient for horsepower in the model indicates a statistically significant positive relationship between horsepower and highway MPG since p-value is smaller than 0.5. However, the effect size is relatively small of 0.0163556, suggesting that while increasing horsepower tends to lead to improved highway MPG, other variables also play a role in explaining variations in MPG.
+
+d\.
+
+``` stata
+//linear regression for D including the interaction term
+regress HighwayMpg Length Width Height i.YearReleased c.Horsepower##c.Torque
+//interaction plot for D
+margins, at(Horsepower = (200 400 600) Torque = (260 270 335))
+marginsplot
+```
+
+![](Downloads/attachments/Screenshot 2023-09-25 at 9.59.07 PM.png)
+
+![](Downloads/attachments/Screenshot 2023-09-25 at 9.59.23 PM.png)
+
+![](Downloads/attachments/Screenshot 2023-09-25 at 9.59.49 PM.png)
+
+Based on summary statistic, the reasonable values for torque will be 177, 257, and 332, which are the 1st quantile, median, and 3rd quantile. The reasonable value for Horsepower will be about 185, 263, and 317, which are around the 1st quantile, median, and 3rd quantile. I choose year 2011 because it is close to the middle, but more recent than the mean of released years. As torque increases, the effect of horsepower to highway MPG becomes smaller.
+
+The results are the same as in R.
