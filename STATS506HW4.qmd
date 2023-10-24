@@ -128,7 +128,7 @@ link to the SAS results: https://github.com/limchw/stats506/blob/main/SAT506HW4-
 
 a\.
 
-``` SAS
+``` sas
 /* Specify the file path */
 filename recs2020 '/home/u63650690/recs2020_public_v5.csv';
 
@@ -142,13 +142,13 @@ run;
 
 /* Get table of percent of each states with sampling weight */
 proc freq data = recs2020_data;
-	TABLES state_name / OUT = state_freq;
-	WEIGHT NWEIGHT;
+    TABLES state_name / OUT = state_freq;
+    WEIGHT NWEIGHT;
 run;
 
 /* Sort the table with descending order*/
 proc sort data = state_freq;
-	BY DESCENDING COUNT;
+    BY DESCENDING COUNT;
 run;
 
 /* Get the state of highest percentage */
@@ -158,11 +158,11 @@ run;
 
 b\.
 
-``` SAS
+``` sas
 /* Get Michigan's percentage */
 data Michigan;
-	SET state_freq;
-	WHERE state_name = 'Michigan';
+    SET state_freq;
+    WHERE state_name = 'Michigan';
 run;
 
 proc print data = Michigan;
@@ -171,7 +171,7 @@ run;
 
 c\.
 
-``` SAS
+``` sas
 /* Create a histogram of the log of the total electricity cost */
 proc univariate data=recs2020_data noprint;
   var LOG_DOLLAREL; /* Use the new variable */
@@ -182,7 +182,7 @@ run;
 
 d\.
 
-``` SAS
+``` sas
 /* Create a dataset with weighted values */
 data recs2020_weighted;
   set recs2020_data;
@@ -190,7 +190,7 @@ data recs2020_weighted;
 run;
 
 /* Fit a linear regression model with weights */
-proc reg data=recs2020_weighted;
+proc reg data=recs2020_weighted plots=none;
   model LOG_DOLLAREL = TOTROOMS PRKGPLC1;
   output out=reg_results predicted=PredictedDOLLAREL residual=ResidualDOLLAREL;
   title 'Linear Model';
@@ -199,7 +199,7 @@ run;
 
 e\.
 
-``` SAS
+``` sas
 /* Create a dataset with predicted and actual values (not on the log scale) */
 data reg_results_nolog;
   set reg_results;
@@ -226,7 +226,7 @@ The codebook for the 2022 Survey of Household Economics and Decisionmaking (SHED
 
 b\.
 
-``` SAS
+``` sas
 /* Specify the file path */
 filename mydata '/home/u63650690/public2022.csv';
 
@@ -239,15 +239,15 @@ proc import datafile=mydata
 run;
 
 data public2022_data;
-	set public2022_data;
-	keep CaseID	caseid2021	caseid2020	caseid2019	weight_pop	B2	B3	B7_b 
-	GH1 ND2 ppeducat ppethm;
+    set public2022_data;
+    keep CaseID caseid2021  caseid2020  caseid2019  weight_pop  B2  B3  B7_b 
+    GH1 ND2 ppeducat ppethm;
 run;
 ```
 
 c\.
 
-``` SAS
+``` sas
 proc export data=public2022_data
     outfile='/home/u63650690/new_mydata.csv'  
     dbms=csv replace;           
@@ -263,7 +263,7 @@ import delimited "C:\Users\limcw\Downloads\new_mydata.csv", clear
 describe
 ```
 
-![](images/Screenshot 2023-10-23 at 11.16.53 PM.png){width="419"}
+![](images/Screenshot%202023-10-23%20at%2011.16.53%20PM.png){width="419"}
 
 The observations are total 11,667 and the code book states that unique values for caseID, the row number is indeed 11,667.
 
@@ -284,7 +284,7 @@ replace b3_numeric = 5 if b3 == "Living comfortably"
 gen WorseOff = (b3_numeric <= 2)  // 1 for "worse off", 0 for "same/better off"
 ```
 
-![](images/Screenshot 2023-10-23 at 11.17.26 PM.png){width="436"}
+![](images/Screenshot%202023-10-23%20at%2011.17.26%20PM.png){width="436"}
 
 f\.
 
@@ -303,9 +303,9 @@ svy: logistic WorseOff i.b7_b_numeric i.gh1_numeric i.nd2_numeric
 i.ppeducat_numeric i.ppethm_numeric
 ```
 
-![](images/Screenshot 2023-10-23 at 11.19.08 PM.png)
+![](images/Screenshot%202023-10-23%20at%2011.19.08%20PM.png)
 
-![](images/Screenshot 2023-10-23 at 11.19.23 PM.png)
+![](images/Screenshot%202023-10-23%20at%2011.19.23%20PM.png)
 
 I would say that the thinking that chance of experiencing a natural disaster or severe weather event will be higher, lower or about the same in 5 years has significant predicting whether family is better or worse off based on the low p-value, and also other variables have low p-values except the variables of country's economic condition and race.
 
