@@ -1,0 +1,331 @@
+---
+title: "STATS506HW4"
+format: pdf
+editor: visual
+---
+
+## Problem 1- Tidyverse
+
+a\.
+
+```{r}
+library(nycflights13)
+library(tidyverse)
+library(survey)
+mydata = read.csv("/Users/chaewonlim/Downloads/output.csv")
+```
+
+```{r}
+# Generate a table reporting the mean and median departure delay per airport
+departure_delay <- flights %>%
+  group_by(origin) %>%
+  summarise(
+    mean_departure_delay = mean(dep_delay, na.rm = TRUE),
+    median_departure_delay = median(dep_delay, na.rm = TRUE)
+  ) %>%
+  left_join(airports, by = c("origin" = "faa")) %>%
+  select(name, mean_departure_delay, median_departure_delay) %>%
+  arrange(desc(mean_departure_delay))
+
+# Generate a table reporting the mean and median arrival delay per airport
+arrival_delay <- flights %>%
+  group_by(dest) %>%
+  summarise(
+    mean_arrival_delay = mean(arr_delay, na.rm = TRUE),
+    median_arrival_delay = median(arr_delay, na.rm = TRUE),
+    num_flights = n()
+  ) %>%
+  filter(num_flights >= 10) %>%
+  left_join(airports, by = c("dest" = "faa")) %>%
+  select(name, mean_arrival_delay, median_arrival_delay) %>%
+  arrange(desc(mean_arrival_delay))
+
+# Print the departure delay table
+print(departure_delay)
+
+# Print the arrival delay table
+print(arrival_delay)
+```
+
+b\.
+
+```{r}
+# Find the aircraft model with the fastest average speed
+fastest_speed_model <- flights %>%
+  left_join(planes, by = c("tailnum")) %>%
+  group_by(model) %>%
+  summarise(
+    avg_speed_mph = mean(speed, na.rm = TRUE),
+    num_flights = n()) %>%
+  arrange(desc(avg_speed_mph)) %>%
+  head(1)
+
+# Print the fastest speed model summary
+print(fastest_speed_model)
+```
+
+The number of flights of the aircraft model with the fastest average speed is 91.
+
+## Problem 2- get_temp()
+
+```{r}
+nnmaps <- read.csv("/Users/chaewonlim/Desktop/STATS506/chicago-nmmaps.csv")
+nnmaps$date <- as.Date(nnmaps$date)
+```
+
+```{r}
+get_temp <- function(anymonth, anyyear, data, celsius = FALSE, 
+                     average_fn = mean) {
+  # Extract the first 3 letters from the input month
+  month_abbr <- substr(tolower(anymonth), 1, 3)
+  # Initialize temperature as NaN
+  temperature <- NaN
+  # Check if the input month is numeric or a string
+  if (is.numeric(anymonth)) {
+    if (anymonth >= 1 && anymonth <= 12) {
+      filtered_data <- data %>%
+        filter(month_numeric == anymonth, year == anyyear)
+      if (nrow(filtered_data) > 0) {
+        temperature <- average_fn(filtered_data$temp)
+        if (celsius) {
+          temperature <- (temperature - 32) * 5/9
+        }
+      }
+    }
+  } else if (is.character(month_abbr)) {  # Use the extracted abbreviation
+    filtered_data <- data %>%
+      filter(tolower(substr(month, 1, 3)) == month_abbr, year == anyyear)
+      if (nrow(filtered_data) > 0) {
+        temperature <- average_fn(filtered_data$temp)
+      if (celsius) {
+        temperature <- (temperature - 32) * 5/9
+        }
+      }
+    }
+  # Check if temperature is still NaN, and then print an error message
+  if (is.nan(temperature)) {
+    cat("No data found for the input month and year. Check your input.")
+  }
+  return(temperature)
+}
+
+#Test get_temp function
+get_temp("Apr", 1999, data = nnmaps)
+get_temp("Apr", 1999, data = nnmaps, celsius = TRUE)
+get_temp(10, 1998, data = nnmaps, average_fn = median)
+get_temp(13, 1998, data = nnmaps)
+get_temp(2, 2005, data = nnmaps)
+get_temp("November", 1999, data = nnmaps, celsius = TRUE,
+         average_fn = function(x) {
+           x %>% sort -> x
+           x[2:(length(x) - 1)] %>% mean %>% return
+         })
+```
+
+## Problem 3- SAS
+
+link to the SAS results: https://github.com/limchw/stats506/blob/main/SAT506HW4-results.html
+
+a\.
+
+``` SAS
+/* Specify the file path */
+filename recs2020 '/home/u63650690/recs2020_public_v5.csv';
+
+/* Import the CSV file */
+proc import datafile=recs2020
+    out=recs2020_data
+    dbms=csv
+    replace;
+    getnames=yes;
+run;
+
+/* Get table of percent of each states with sampling weight */
+proc freq data = recs2020_data;
+	TABLES state_name / OUT = state_freq;
+	WEIGHT NWEIGHT;
+run;
+
+/* Sort the table with descending order*/
+proc sort data = state_freq;
+	BY DESCENDING COUNT;
+run;
+
+/* Get the state of highest percentage */
+proc print data = state_freq(obs=1);
+run;
+```
+
+b\.
+
+``` SAS
+/* Get Michigan's percentage */
+data Michigan;
+	SET state_freq;
+	WHERE state_name = 'Michigan';
+run;
+
+proc print data = Michigan;
+run;
+```
+
+c\.
+
+``` SAS
+/* Create a histogram of the log of the total electricity cost */
+proc univariate data=recs2020_data noprint;
+  var LOG_DOLLAREL; /* Use the new variable */
+  histogram LOG_DOLLAREL /
+    midpoints=(0 to 10 by 0.5); /* Adjust the midpoints as needed */
+run;
+```
+
+d\.
+
+``` SAS
+/* Create a dataset with weighted values */
+data recs2020_weighted;
+  set recs2020_data;
+  weight = NWEIGHT; 
+run;
+
+/* Fit a linear regression model with weights */
+proc reg data=recs2020_weighted;
+  model LOG_DOLLAREL = TOTROOMS PRKGPLC1;
+  output out=reg_results predicted=PredictedDOLLAREL residual=ResidualDOLLAREL;
+  title 'Linear Model';
+run;
+```
+
+e\.
+
+``` SAS
+/* Create a dataset with predicted and actual values (not on the log scale) */
+data reg_results_nolog;
+  set reg_results;
+  ActualDOLLAREL = exp(LOG_DOLLAREL); /* Convert back to the original scale */
+  PredictedDOLLAREL = exp(PredictedDOLLAREL);
+run;
+
+/* Create a scatterplot of predicted vs actual total electricity cost 
+(not on the log scale) */
+proc sgplot data=reg_results_nolog;
+  scatter x=ActualDOLLAREL y=PredictedDOLLAREL;
+  xaxis label="Actual Total Electricity Cost";
+  yaxis label="Predicted Total Electricity Cost";
+  title "Scatterplot of Predicted vs. Actual Total Electricity Cost 
+  (Not on Log Scale)";
+run;
+```
+
+## Problem 4- Multiple tools
+
+a\.
+
+The codebook for the 2022 Survey of Household Economics and Decisionmaking (SHED) collected data through Ipsos' online KnowledgePanel, which is then its variables are cleaned and validated. Analysis weights, particularly the "Weight_pop," ensures the sample population to accurately represent the U.S. adult population. The codebook describes each variable's name and what it represents in the data set.
+
+b\.
+
+``` SAS
+/* Specify the file path */
+filename mydata '/home/u63650690/public2022.csv';
+
+/* Import the CSV file */
+proc import datafile=mydata
+    out=public2022_data
+    dbms=csv
+    replace;
+    getnames=yes;
+run;
+
+data public2022_data;
+	set public2022_data;
+	keep CaseID	caseid2021	caseid2020	caseid2019	weight_pop	B2	B3	B7_b 
+	GH1 ND2 ppeducat ppethm;
+run;
+```
+
+c\.
+
+``` SAS
+proc export data=public2022_data
+    outfile='/home/u63650690/new_mydata.csv'  
+    dbms=csv replace;           
+run;
+```
+
+d\.
+
+``` stata
+// Load the CSV file into Stata
+import delimited "C:\Users\limcw\Downloads\new_mydata.csv", clear
+
+describe
+```
+
+![](images/Screenshot 2023-10-23 at 11.16.53 PM.png){width="419"}
+
+The observations are total 11,667 and the code book states that unique values for caseID, the row number is indeed 11,667.
+
+e\.
+
+``` stata
+* Create a numeric variable based on the string variable B3
+gen b3_numeric = .
+
+* Recode string values into numeric values
+replace b3_numeric = 1 if b3 == "Much worse off"
+replace b3_numeric = 2 if b3 == "Somewhat worse off"
+replace b3_numeric = 3 if b3 == "About the same"
+replace b3_numeric = 4 if b3 == "Somewhat better off"
+replace b3_numeric = 5 if b3 == "Living comfortably"
+
+* Recode numeric values into binary (0 for same/better off, 1 for worse off)
+gen WorseOff = (b3_numeric <= 2)  // 1 for "worse off", 0 for "same/better off"
+```
+
+![](images/Screenshot 2023-10-23 at 11.17.26 PM.png){width="436"}
+
+f\.
+
+``` stata
+svyset caseid [pw=weight_pop]
+
+* Encode string variables to numeric
+encode b7_b, gen(b7_b_numeric)
+encode gh1, gen(gh1_numeric)
+encode nd2, gen(nd2_numeric)
+encode ppeducat, gen(ppeducat_numeric)
+encode ppethm, gen(ppethm_numeric)
+
+* Perform logistic regression with numeric variables
+svy: logistic WorseOff i.b7_b_numeric i.gh1_numeric i.nd2_numeric 
+i.ppeducat_numeric i.ppethm_numeric
+```
+
+![](images/Screenshot 2023-10-23 at 11.19.08 PM.png)
+
+![](images/Screenshot 2023-10-23 at 11.19.23 PM.png)
+
+I would say that the thinking that chance of experiencing a natural disaster or severe weather event will be higher, lower or about the same in 5 years has significant predicting whether family is better or worse off based on the low p-value, and also other variables have low p-values except the variables of country's economic condition and race.
+
+g\.
+
+``` stata
+export delimited "output.csv", replace
+```
+
+h\.
+
+```{r}
+survey_design <- svydesign(id = ~ caseid, weight = ~ weight_pop, data = mydata)
+
+model <- svyglm(WorseOff ~ factor(b7_b) + factor(gh1)+ factor(nd2) + factor(ppeducat) +
+                  factor(ppethm), design = survey_design)
+
+r2 <- 1 - (model$deviance / model$null.deviance)
+
+print(r2)
+```
+
+The pseudo-R\^2 value is 0.1116853.
