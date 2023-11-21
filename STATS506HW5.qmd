@@ -1,0 +1,248 @@
+---
+title: "STATS506HW5"
+format: pdf
+editor: visual
+---
+
+```{}
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(nycflights13)
+library(data.table)
+nnmaps <- read.csv("/Users/chaewonlim/Desktop/STATS506/chicago-nmmaps.csv")
+```
+
+## **Problem 1 - Plotting**
+
+a\.
+
+```{r}
+#1a
+nnmaps$date <- as.Date(nnmaps$date)
+
+#Change unit
+nnmaps$tempc <- (nnmaps$temp - 32) *(5/9)
+
+mean_temp <- nnmaps %>%
+  group_by(month, season) %>%
+  summarize(means = mean(tempc))
+
+#factor months
+mean_temp$month <- factor(mean_temp$month, levels = c("Jan", "Feb", "Mar", "Apr", "May", 
+                                                      "Jun", "Jul", "Aug", "Sep", "Oct", 
+                                                      "Nov", "Dec"))
+
+#scatter-plot
+ggplot(mean_temp, aes(x = month, y = means, color = season)) +
+  geom_point() +
+  geom_line(aes(group = season))+
+  labs(title = "Average Monthly Temperature",
+       x = "Month",
+       y = "Average Temperature (Celsius)") +
+  scale_color_manual(values = c("Winter" = "red", "Spring" = "green", 
+                                "Summer" = "blue", 
+                                "Autumn" = "orange"),
+                     breaks = c("Spring", "Summer", "Autumn", "Winter"))
+```
+
+b\.
+
+```{r}
+#1b
+
+#get dataset of mean of each variable
+mean_data <- nnmaps %>%
+  group_by(month) %>%
+  summarize(mean_temp = mean(tempc),
+            mean_O3 = mean(o3),
+            mean_PM10 = mean(pm10, na.rm = TRUE),
+            mean_dewpoint = mean(dewpoint))
+
+mean_temps <- select(mean_data, month, mean_temp)
+mean_O3 <- select(mean_data, month, mean_O3)
+mean_PM10 <- select(mean_data, month, mean_PM10)
+mean_dewpoint <- select(mean_data, month, mean_dewpoint)
+
+#plot lines
+ggplot() +
+  geom_line(data = mean_temps, 
+            aes(x = month, y = mean_temp, group = 1, color = "Mean Monthly Temperature")) +
+  geom_line(data = mean_O3, 
+            aes(x = month, y = mean_O3, group = 1, color = "Mean Monthly O3")) +
+  geom_line(data = mean_PM10, 
+            aes(x = month, y = mean_PM10, group = 1, color = "Mean Monthly PM10")) +
+  geom_line(data = mean_dewpoint, 
+            aes(x = month, y = mean_dewpoint, group = 1, 
+                color = "Mean Monthly Dewpoint")) +
+  labs(title = "Mean Monthly 
+       Climate Variables",
+       x = "Month",
+       y = "Mean Value") +
+  scale_color_manual(values = c("Mean Monthly Temperature" = "red", 
+                                "Mean Monthly O3" = "green", 
+                                "Mean Monthly PM10" = "blue", 
+                                "Mean Monthly Dewpoint" = "orange")) +
+  theme(legend.position = "top")
+```
+
+The variable PM 10 changes the least through out the month compared to other variables, hence seems to have the least seasonal trend.
+
+## **Problem 2 - OOP Programming**
+
+```{r}
+#2
+#define mypoly
+setClass(
+  "mypoly",
+  slots = c(
+    coef = "numeric",
+    degree = "numeric"
+  )
+)
+
+#define function to create poly
+make_mypoly <- function(expression) {
+  parsed <- strsplit(gsub("\\s", "", expression), "[+\\-]")
+  coef <- numeric()
+  degree <- numeric()
+  for (term in parsed[[1]]) {
+    parts <- strsplit(term, "x\\^")
+    if (length(parts[[1]]) == 2) {
+      coef <- c(coef, as.numeric(parts[[1]][1]))
+      degree <- c(degree, as.numeric(parts[[1]][2]))
+    } else if (length(parts[[1]]) == 1) {
+      if (term %in% c("x", "-x")) {
+        coef_val <- ifelse(term == "x", 1, -1)
+        coef <- c(coef, coef_val)
+        degree <- c(degree, 1)
+      } else {
+        coef <- c(coef, as.numeric(parts[[1]][1]))
+        degree <- c(degree, 0)
+      }
+    }
+  }
+  
+  new("mypoly", coef = coef, degree = degree)
+}
+
+#define method
+setMethod("show", "mypoly", function(object) {
+  cat("Poly: ")
+  for (i in seq_along(object@coef)) {
+    cat(object@coef[i], 
+        if (!is.na(object@degree[i]) & 
+            object@degree[i] != 0) paste("x^", object@degree[i]) else "",
+        sep = "")
+    if (i < length(object@coef)) {
+      cat(" + ")
+    }
+  }
+  cat("\n")
+})
+
+#define method +
+setMethod("+", signature("mypoly", "mypoly"), function(e1, e2) {
+  max_degree <- max(max(e1@degree), max(e2@degree))
+  coef1 <- numeric(max_degree + 1)
+  coef2 <- numeric(max_degree + 1)
+  
+  coef1[max_degree - e1@degree + 1] <- e1@coef
+  coef2[max_degree - e2@degree + 1] <- e2@coef
+  
+  result_coef <- coef1 + coef2
+  result_degree <- max_degree:0
+  
+  new("mypoly", coef = result_coef, degree = result_degree)
+})
+
+#define method -
+setMethod("-", signature("mypoly", "mypoly"), function(e1, e2) {
+  max_degree <- max(max(e1@degree), max(e2@degree))
+  coef1 <- numeric(max_degree + 1)
+  coef2 <- numeric(max_degree + 1)
+  
+  coef1[max_degree - e1@degree + 1] <- e1@coef
+  coef2[max_degree - e2@degree + 1] <- e2@coef
+  
+  result_coef <- coef1 - coef2
+  result_degree <- max_degree:0
+  
+  non_zero_indices <- which(result_degree <= max_degree & result_coef != 0)
+  result_coef <- result_coef[non_zero_indices]
+  result_degree <- result_degree[non_zero_indices]
+  
+  new("mypoly", coef = result_coef, degree = result_degree)
+})
+
+```
+
+b\.
+
+```{r}
+p1 <- make_mypoly("3x^2 + 2")
+p2 <- make_mypoly("7x^3 - 2x^2 - x + 17")
+
+p1
+p2
+p1 + p2
+p1 - p2
+```
+
+## **Problem 3 - data.table**
+
+a\.
+
+```{r}
+# Convert flights, planes, and airports to data.table
+flights_dt <- as.data.table(flights)
+planes_dt <- as.data.table(planes)
+airports_dt <- as.data.table(airports)
+
+#mean and median departure delay by airport
+departure_delay_dt <- flights_dt[, .(mean_dep_delay = mean(dep_delay, na.rm = TRUE), 
+                                      median_dep_delay = median(dep_delay, na.rm = TRUE), 
+                                      num_flights = .N), by = origin][num_flights >= 10]
+
+setnames(departure_delay_dt, "origin", "faa")
+
+departure_delay_dt <- airports_dt[departure_delay_dt, 
+                                  on = "faa", nomatch = 0, 
+                                  .(name, mean_dep_delay, 
+                                    median_dep_delay)][order(-mean_dep_delay)]
+
+#mean and median arrival delay by airport
+arrival_delay_dt <- flights_dt[, .(mean_arrival_delay = 
+                                     mean(arr_delay, na.rm = TRUE),
+                                    median_arrival_delay = 
+                                     median(arr_delay, na.rm = TRUE),
+                                   num_flights = .N), 
+                               by = .(dest)][num_flights >= 10][airports_dt, on = 
+                                                                  .(dest = 
+                                                                      faa)][order(-mean_arrival_delay),.(name, mean_arrival_delay,
+                                                                                                         median_arrival_delay)]
+
+arrival_delay_dt <- arrival_delay_dt[complete.cases(arrival_delay_dt), ]
+
+print(arrival_delay_dt, n = Inf)
+```
+
+b\.
+
+```{r}
+# aircraft model with the fastest average speed
+fastest_speed_model_dt <- flights_dt[
+  planes_dt, on = .(tailnum = tailnum)][
+  , .(avg_speed_mph = mean(speed, na.rm = TRUE),
+      num_flights = .N),
+  by = .(model)][
+  order(-avg_speed_mph)][
+  head(1)]
+
+print(fastest_speed_model_dt)
+```
+
+The number of flights of the aircraft model with the fastest average speed is 91.
