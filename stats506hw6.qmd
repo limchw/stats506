@@ -1,0 +1,170 @@
+---
+title: "stats504hw6"
+format: pdf
+editor: visual
+---
+
+## **Stratified Bootstrapping**
+
+## 1. Without any parallel processing
+
+```{r}
+library(nycflights13)
+library(future)
+library(dplyr)
+library(boot)
+library(future.apply)
+library(parallel)
+
+# Define function getting mean
+mean_air_time <- function(data) {
+  return(mean(data$air_time, na.rm = TRUE))
+}
+
+# Calculate standard error
+std_error <- function(data) {
+  n <- sum(!is.na(data$air_time))
+  if (n <= 1) {
+    return(NA)
+  }
+  return(sd(data$air_time, na.rm = TRUE) / sqrt(n))
+}
+
+# Function for performing stratified bootstrap
+stratified_bootstrap <- function(data, indices) {
+  sampled_data <- data[indices, ]
+  return(mean_air_time(sampled_data))
+}
+
+# Prepare data
+flights_data <- flights %>% select(origin, dest, air_time)
+
+# Number of bootstraps
+n_bootstrap <- 1000
+
+# Store bootstrapped results
+bootstrap_results <- replicate(n_bootstrap, {
+  indices <- unlist(tapply(seq_len(nrow(flights_data)), flights_data$dest, sample, replace = TRUE))
+  stratified_bootstrap(flights_data, indices)
+})
+
+# Create table with means and confidence intervals
+result_table <- flights_data %>%
+  group_by(origin) %>%
+  summarise(
+    mean_air_time = mean(air_time, na.rm = TRUE),
+    std_error = sd(air_time, na.rm = TRUE) / sqrt(sum(!is.na(air_time))),
+    lower_ci = mean_air_time - 1.96 * std_error(.),
+    upper_ci = mean_air_time + 1.96 * std_error(.)
+  )
+
+print(result_table)
+```
+
+## 2-1. parallel processing (future)
+
+```{r}
+
+# Set up parallel processing
+plan(multisession)
+
+flights_data <- flights %>% select(origin, dest, air_time)
+
+# Store bootstrapped results using future package
+bootstrap_results <- future_lapply(
+  future_replicate(n_bootstrap, {
+    indices <- unlist(tapply(seq_len(nrow(flights_data)), flights_data$dest, sample, replace = TRUE))
+    stratified_bootstrap(flights_data, indices)
+  }),
+  c
+)
+
+# Create table with means and confidence intervals
+result_table <- flights_data %>%
+  group_by(origin) %>%
+  summarise(
+    mean_air_time = mean(air_time, na.rm = TRUE),
+    std_error = sd(air_time, na.rm = TRUE) / sqrt(sum(!is.na(air_time))),
+    lower_ci = mean_air_time - 1.96 * std_error(.),
+    upper_ci = mean_air_time + 1.96 * std_error(.)
+  )
+
+print(result_table)
+```
+
+## 2-2. parallel processing (parallel)
+
+```{r}
+# Number of CPU cores
+num_cores <- detectCores()
+
+# Set up parallel processing
+cl <- makeCluster(num_cores)
+clusterExport(cl, c("flights_data", "stratified_bootstrap", "mean_air_time"))
+
+# Stratified bootstrapping by dest and origin using parallel package
+bootstrap_results_parallel <- parLapply(cl, 1:n_bootstrap, function(i, data = flights_data) {
+  indices <- unlist(tapply(seq_len(nrow(data)), data$dest, sample, replace = TRUE))
+  stratified_bootstrap(data, indices)
+})
+
+# Close the parallel cluster
+stopCluster(cl)
+
+# Create table with means and confidence intervals
+result_table_parallel <- flights_data %>%
+  group_by(origin) %>%
+  summarise(
+    mean_air_time = mean(air_time, na.rm = TRUE),
+    std_error = sd(air_time, na.rm = TRUE) / sqrt(sum(!is.na(air_time))),
+    lower_ci = mean_air_time - 1.96 * std_error,
+    upper_ci = mean_air_time + 1.96 * std_error
+  )
+
+print(result_table_parallel)
+```
+
+## Compare performances
+
+```{r}
+
+# No parallel processing
+start_time_serial <- system.time({
+  bootstrap_results_serial <- replicate(n_bootstrap, {
+    indices <- unlist(tapply(seq_len(nrow(flights_data)), flights_data$dest, sample, replace = TRUE))
+    stratified_bootstrap(flights_data, indices)
+  })
+})[3]
+
+# Parallel version using future package
+plan(multisession)
+
+start_time_parallel_future <- system.time({
+  bootstrap_results_parallel_future <- future_lapply(
+    future_replicate(n_bootstrap, {
+      indices <- unlist(tapply(seq_len(nrow(flights_data)), flights_data$dest, sample, replace = TRUE))
+      stratified_bootstrap(flights_data, indices)
+    }),
+    c
+  )
+})[3]
+
+# Parallel version using parallel package
+num_cores <- detectCores()
+
+cl <- makeCluster(num_cores)
+clusterExport(cl, c("flights_data", "stratified_bootstrap", "mean_air_time"))
+
+start_time_parallel <- system.time({
+  bootstrap_results_parallel <- parLapply(cl, 1:n_bootstrap, function(i, data = flights_data) {
+    indices <- unlist(tapply(seq_len(nrow(data)), data$dest, sample, replace = TRUE))
+    stratified_bootstrap(data, indices)
+  })
+})[3]
+
+cat("Serial Execution Time:", start_time_serial, "seconds\n")
+cat("Parallel (future) Execution Time:", start_time_parallel_future, "seconds\n")
+cat("Parallel (parallel) Execution Time:", start_time_parallel, "seconds\n")
+```
+
+The results are similar, but using no parallel processing takes the longest.
