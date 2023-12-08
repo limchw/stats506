@@ -1,0 +1,192 @@
+---
+title: "STATS506Project"
+format: html
+editor: visual
+---
+
+```{r}
+library(dplyr)
+data <- read.csv("/Users/chaewonlim/Downloads/mydata.csv")
+head(data)
+dim(data)
+```
+
+```{r}
+data <- data %>% dplyr::select(year, id, wrkstat, marital, sibs, childs, age, educ, sex, race, hompop, babies, teens, adults, racfew, abnomore, abpoor, chldidel, chldmore, coninc)
+
+# Drop rows with chldidel == "iap" or "don't know"
+data <- data %>%
+  filter(chldidel != "iap" & chldidel != "don't know")
+
+# Replace "7 or more" and "as many as you want" with "7"
+data$chldidel <- recode(data$chldidel, 
+                                      `7 or more` = "7",
+                                      `as many as you want` = "7")
+
+data$wrkstat <- recode(data$wrkstat,
+                            "retired" = "unemployed",
+                            "keeping house" = "unemployed",
+                            "in school" = "unemployed",
+                            "unemployed, laid off, looking for work" = "unemployed",
+                            "with a job, but not at work because of temporary illness, vacation, strike" = "unemployed",
+                            "other" = "unemployed",
+                            "no answer" = "unemployed",
+                            "skipped on web" = "unemployed")
+
+# Replace specified values in marital variable
+data$marital <- recode(data$marital,
+                            "divorced" = "other",
+                            "widowed" = "other",
+                            "separated" = "other",
+                            "no answer" = "other",
+                            "skipped on web" = "other")
+
+# Replace "9" with "8 or more"
+data$childs <- recode(data$childs,
+                                  "9" = "8 or more")
+
+# Convert the variable to numeric, replacing non-numeric values with NA
+data$childs <- as.numeric(as.character(data$childs))
+
+# Replace "8 or more" with 8
+data$childs <- recode(data$childs, `8 or more` = 8)
+
+# Now, all character ones will be converted to NA
+data$childs <- ifelse(is.na(as.numeric(as.character(data$childs))),
+                                  NA,
+                                  data$childs)
+
+# Now, all character ones will be converted to NA
+data$sibs <- ifelse(is.na(as.numeric(as.character(data$sibs))),
+                                  NA,
+                                  data$sibs)
+
+data$age <- as.numeric(data$age)
+
+
+# Now, all character ones will be converted to NA
+data$educ <- ifelse(is.na(as.numeric(as.character(data$educ))),
+                                  NA,
+                                  data$educ)
+
+# Replace values not equal to "female" or "male" with "other"
+data$sex <- recode(data$sex,
+                           "no answer" = "other",
+                           "iap" = "other",
+                           "skipped on web" = "other",
+                           "don't know" = "other")
+
+# Replace "iap" with NA in the race variable
+data$race <- na_if(data$race, "iap")
+
+# Now, all character ones will be converted to NA
+data$hompop <- ifelse(is.na(as.numeric(as.character(data$hompop))),
+                                  NA,
+                                  data$hompop)
+
+# Convert the variable to numeric, replacing non-numeric values with "other"
+data$babies <- ifelse(is.na(as.numeric(as.character(data$babies))),
+                                      "0",
+                                      data$babies)
+
+# Convert the variable to numeric, replacing non-numeric values with "other"
+data$teens <- ifelse(data$teens == "0 household members between 13 to 17",
+                                            0,
+                                            ifelse(data$teens == "8 or more",
+                                                   8,
+                                                   ifelse(is.na(as.numeric(as.character(data$teens))),
+                                                          "other",
+                                                          data$teens)))
+
+# Convert the variable to numeric, replacing non-numeric values with "other"
+data$adults <- ifelse(data$adults == "1 adult in household",
+                      1,
+                      ifelse(data$adults == "8 or more",
+                             8,
+                             ifelse(is.na(as.numeric(as.character(data$adults))),
+                                    "other",
+                                    data$adults)))
+
+# Replace specified values in the racefew variable
+data$racfew <- ifelse(data$racfew %in% c("iap", "don't know", "no answer"),
+                       "other",
+                       data$racfew)
+
+# Replace values in the abnomore variable
+data$abnomore <- ifelse(data$abnomore %in% c("yes", "no"),
+                        data$abnomore,
+                        "other")
+
+# Replace values in the abpoor variable
+data$abpoor <- ifelse(data$abpoor %in% c("yes", "no"),
+                        data$abpoor,
+                        "other")
+
+# Replace values in the chldmore variable
+data$chldmore <- ifelse(data$chldmore %in% c("yes", "no"),
+                        data$chldmore,
+                        "other")
+
+# Now, all character ones will be converted to NA
+data$coninc <- ifelse(is.na(as.numeric(as.character(data$coninc))),
+                                  NA,
+                                  data$coninc)
+
+# Convert variable to factor
+data$wrkstat <- factor(data$wrkstat)
+data$marital <- factor(data$marital)
+data$wrkstat <- factor(data$marital)
+data$sex <- factor(data$sex)
+data$race <- factor(data$race)
+data$racfew <- factor(data$racfew)
+data$abnomore <- factor(data$abnomore)
+data$abpoor <- factor(data$abpoor)
+data$chldmore <- factor(data$chldmore)
+
+# Convert character variable to integer
+data$sibs <- as.numeric(data$sibs)
+data$hompop <- as.numeric(data$hompop)
+data$babies <- as.numeric(data$babies)
+data$teens <- as.numeric(data$teens)
+data$adults <- as.numeric(data$adults)
+data$coninc <- as.numeric(data$coninc)
+data$chldidel <- as.numeric(data$chldidel)
+data$educ <- as.numeric(data$educ)
+
+# Get unique values for all variables
+unique_values <- sapply(data, unique)
+unique_values
+
+# Get data types for all variables
+variable_types <- sapply(data, class)
+variable_types
+
+summary(data)
+```
+
+```{r}
+# Poisson Regression Model
+data <- na.omit(data)
+mod1 <- glm(chldidel ~ .-id, data = data, family = poisson)
+summary(mod1)
+```
+
+```{r}
+# Poisson regression model after removing certain variables
+mod2 <- glm(chldidel ~ .-id - educ - babies - teens - racfew - abnomore - coninc, data = data, family = poisson)
+summary(mod2)
+```
+
+```{r}
+# Post-modeling assumption checks
+
+# Residuals vs. Fitted Values
+plot(fitted(mod2), residuals(mod2), ylab = "Residuals", xlab = "Fitted Values")
+
+#Scale-Location Plot
+plot(sqrt(abs(residuals(mod2))) ~ fitted(mod2), ylab = "sqrt(|Residuals|)", xlab = "Fitted Values")
+
+#QQ Plot of Deviance Residuals
+qqnorm(residuals(mod2, type = "deviance"))
+qqline(residuals(mod2, type = "deviance"))
+```
